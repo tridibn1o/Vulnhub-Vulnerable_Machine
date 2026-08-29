@@ -21,12 +21,12 @@ This repository documents my methodology for reconnaissance, enumeration, vulner
 
 | Machine     | Difficulty | Focus | Status         |
 | ----------- | ---------- | ----- | -------------- |
-| Coming Soon | —          | —     | 🔄 In Progress |
+| MR.ROBOT    | —          | —     | 🔄 In Progress |
 
 ---
 
 ## 🔍 Methodology
-
+ 
 The general workflow used for each machine is:
 
 ```text
@@ -73,7 +73,7 @@ vulnhub-Vulnerable_Machine/
 │
 ├── README.md
 │
-├── machine-name/
+├── MR.ROBOT/
 │   └── README.md
 │
 └── another-machine/
