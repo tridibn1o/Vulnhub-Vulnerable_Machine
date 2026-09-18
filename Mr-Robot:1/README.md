@@ -1,165 +1,49 @@
+# Mr. Robot — VulnHub Write-up
 
-# Mr-Robot: 1
+### Machine Information
 
-## 📌 Machine Information
-
-| Item       | Details                     |
-| ---------- | --------------------------- |
-| Platform   | VulnHub                     |
-| Machine    | Mr-Robot: 1                 |
-| Difficulty | —                           |
-| Target     | Intentionally vulnerable VM |
-| Status     | 🔄 In Progress              |
+| **Machine** | Mr. Robot: 1 |
+| **Platform** | VulnHub |
+| **Difficulty** | Intermediate |
+| **Attacker OS** | Kali Linux |
+| **Environment** | Isolated VirtualBox Lab (Host-Only / NatNetwork) |
+| **Goal** | Obtain all three keys and achieve root-level access |
 
 ---
 
-## 🎯 Objective
+### Overview
 
-Compromise the Mr-Robot: 1 vulnerable machine and obtain root-level access.
+This write-up documents the complete compromise of the **Mr. Robot: 1** VulnHub machine in an isolated, authorized lab environment. 
 
----
-
-## 🧰 Lab Environment
-
-### Attacker Machine
-
-* Kali Linux
-
-### Target Machine
-
-* Mr-Robot: 1
-
-### Network
-
-* Isolated virtual lab network
+The assessment demonstrates an end-to-end penetration-testing workflow, beginning with host discovery and service reconnaissance, continuing through credential brute-forcing, reverse shell access, and shell stabilization, and culminating in local privilege escalation via SUID binary abuse.
 
 ---
 
-## 🔎 1. Reconnaissance
+### Key Findings
 
-### Target Discovery
+* **Information Disclosure:** `robots.txt` exposed a sensitive dictionary file (`fsocity.dic`) and the first system flag (`key-1-of-3.txt`).
+* **WordPress Authentication Weaknesses:** Login error messaging enabled user enumeration (`elliot`), and the absence of rate limiting permitted offline/online dictionary attacks.
+* **Arbitrary PHP Code Execution:** Unrestricted WordPress theme editing allowed injecting a PHP reverse shell via `404.php`.
+* **Insecure Credential Storage:** An unshadowed MD5 password hash for local user `robot` was stored with world-readable permissions.
+* **Privilege Escalation via SUID Abuse:** Outdated `/usr/local/bin/nmap` (v3.81) retained the SUID root bit, permitting arbitrary root shell escape via interactive mode.
 
-Commands:
+---
 
-```bash
-# Command will be added after discovery
-```
-
-### Target IP
+### Methodology Flow
 
 ```text
-Not discovered yet
-```
-
----
-
-## 🔍 2. Enumeration
-
-### Nmap
-
-```bash
-# Nmap commands and results will be documented here
-```
-
-### Open Ports
-
-| Port | Service | Version | Notes |
-| ---- | ------- | ------- | ----- |
-| —    | —       | —       | —     |
-
----
-
-## 🌐 3. Web Enumeration
-
-### HTTP
-
-Findings:
-
-```text
-To be documented
-```
-
-### Directory Enumeration
-
-```bash
-# Commands and findings will be added here
-```
-
----
-
-## 🧩 4. Vulnerability Identification
-
-Potential vulnerabilities:
-
-```text
-To be determined during enumeration
-```
-
----
-
-## 💥 5. Exploitation
-
-### Initial Access
-
-```text
-To be documented
-```
-
-### Evidence
-
-```text
-Screenshots / terminal output will be added here.
-```
-
----
-
-## 🔐 6. Privilege Escalation
-
-### Enumeration
-
-```bash
-# Commands will be documented here
-```
-
-### Privilege Escalation Path
-
-```text
-To be determined
-```
-
----
-
-## 🏆 7. Proof of Compromise
-
-```text
-Root access / flags will be documented here.
-```
-
----
-
-## 🛡️ 8. Remediation
-
-Potential defensive recommendations:
-
-* Remove unnecessary exposed services
-* Patch vulnerable software
-* Apply least-privilege principles
-* Secure credentials and sensitive files
-* Restrict unnecessary network access
-
----
-
-## 🧠 9. Lessons Learned
-
-To be completed after the machine is compromised.
-
----
-
-## 🛠️ Tools Used
-
-* Nmap
-* Gobuster
-* Burp Suite
-* Netcat
-* Linux command-line tools
-* Other tools as required
+Reconnaissance (Host Discovery & Port Scanning)
+      ↓
+Web Enumeration (robots.txt & Dictionary Recovery)
+      ↓
+WordPress Exploitation (User Enumeration & Brute-Force)
+      ↓
+Initial Access (Reverse Shell via Theme Editor)
+      ↓
+Shell Stabilization (Python PTY Upgrade)
+      ↓
+Horizontal Privilege Escalation (MD5 Hash Cracking -> user 'robot')
+      ↓
+Vertical Privilege Escalation (SUID Nmap Interactive Escape -> root)
+      ↓
+Flag Collection & Post-Exploitation
