@@ -91,7 +91,7 @@ sudo nmap -A 192.168.56.105
 ---
 
 #### 3. Web Surface Enumeration & Key 1
-Inspecting `[http://192.168.56.105/robots.txt](http://192.168.56.105/robots.txt)`:
+Inspecting `[http://192.168.56.105/robots.txt](http://192.168.56.105/robots.txt)` :
 
 ![robots.txt](assets/image/robots.png)
 
