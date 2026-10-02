@@ -21,8 +21,7 @@ This repository documents my methodology for reconnaissance, enumeration, vulner
 
 | Machine     | Difficulty | Focus | Status         |
 | ----------- | ---------- | ----- | -------------- |
-|     | —     |            | —     | In Progress    |
-| MR.ROBOT    |Intermediate|       |   Completed    | 
+| MR.ROBOT    |Intermediate| CTF   |   Completed    | 
 ---
 
 ## 🔍 Methodology
