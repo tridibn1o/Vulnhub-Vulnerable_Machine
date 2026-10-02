@@ -81,7 +81,7 @@ An aggressive scan was performed to detect OS details, service versions, default
 sudo nmap -A 192.168.56.105
 ```
 
-![Nmap scan Target Ip](/assets/image/nmap-scan.png)
+![Nmap scan Target Ip](assets/image/nmap-scan.png)
 
 **Key Findings:**
 * **Port 80/TCP:** Apache httpd 2.4.7 ((Ubuntu))
@@ -176,7 +176,7 @@ Brute-forced the password for user `elliot` using `wpscan`:
 wpscan --url http://192.168.56.105/wp-login.php -U elliot -P clean_fsocity.dic
 ```
 
-![wpscan](assets/image/wpscan_pass.png)
+![wpscan](assets/image/wpscan-pass.png)
 
 Discovered credentials: **`elliot`** : **`ER28-0652`**.
 
