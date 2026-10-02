@@ -55,12 +55,12 @@ Remediation
 * Nmap
 * Burp Suite
 * Gobuster
-* Nikto
+* ffuf
 * Netcat
 * Linux command-line tools
-* Wireshark
 * Metasploit (when appropriate)
-
+* Hydra
+* Wpscan
 ---
 
 ## 📂 Write-ups
