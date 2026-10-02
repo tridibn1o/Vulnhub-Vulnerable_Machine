@@ -24,7 +24,7 @@ This write-up documents the black-box security assessment of the **Mr. Robot: 1*
 
 * **Information Exposure (`robots.txt`):** The web server exposed direct links to a customized dictionary (`fsocity.dic`) and the first key (`key-1-of-3.txt`).
 * **Predictable User Enumeration:** WordPress login error messages differentiated between valid and invalid usernames, confirming account `elliot`.
-* **Insecure File Management:** The WordPress file editor allowed authenticated users to modify PHP template/plugin files, granting Remote Code Execution (RCE).
+* **Insecure File Management:** The WordPress file editor allowed authenticated users to modify PHP template/plugin files, granting `Remote Code Execution (RCE)`.
 * **Weak Credential Storage:** An unshadowed MD5 password hash for local user `robot` was stored in a world-readable file (`password.raw-md5`).
 * **Privilege Escalation via SUID Abuse:** Legacy binary `/usr/local/bin/nmap` (v3.81) was configured with the SUID bit set, allowing an interactive shell escape directly to `root`.
 
@@ -61,7 +61,7 @@ Final Objective (Root proof & key-3-of-3.txt)
 
 ### Phase 1: Reconnaissance & Enumeration
 
-#### 1. Host Discovery
+#### 1. Reconnaissance: Mr Robot 1 Host Discovery with ARP-Scan
 The target machine was located on the VirtualBox Host-Only subnet (`eth1`) using `arp-scan`:
 
 ```bash
@@ -182,7 +182,7 @@ Discovered credentials: **`elliot`** : **`ER28-0652`**.
 
 ---
 
-#### 3. Reverse Shell
+#### 3.Initial Foothold: WordPress Theme Editor/Plugin Remote Code Execution (RCE)
 Logged into the WordPress admin dashboard:
 
 ![wpdashboard](assets/image/wpdashboard.png)
@@ -213,7 +213,7 @@ A connection was established back to the listener as user `daemon`.
 
 ---
 
-#### 4. Shell Stabilization
+#### 4. Shell Stabilization Via TTY And TERM
 Upgraded the limited shell to a fully interactive TTY:
 
 ```bash
@@ -264,7 +264,7 @@ cat /home/robot/key-2-of-3.txt
 
 ---
 
-#### 2. Vertical Escalation (`robot` -> `root`)
+#### 2. Vertical Escalation: Root Shell via SUID Nmap Interactive Mode Escape(`robot` -> `root`)
 Searched for files with the SUID permission bit set:
 
 ```bash
