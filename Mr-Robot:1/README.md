@@ -81,7 +81,7 @@ An aggressive scan was performed to detect OS details, service versions, default
 sudo nmap -A 192.168.56.105
 ```
 
-![Nmap scan Target Ip](assets/image/nmap-scan.png)
+![Nmap scan Target Ip](/assets/image/nmap-scan.png)
 
 **Key Findings:**
 * **Port 80/TCP:** Apache httpd 2.4.7 ((Ubuntu))
